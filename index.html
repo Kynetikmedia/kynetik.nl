@@ -109,6 +109,24 @@
     .board .s { font-weight: 800; font-variant-numeric: tabular-nums; }
     .board li.me { color: var(--lavender); }
     #boardMsg { font-weight: 700; color: #fff; margin-bottom: 12px; }
+    /* Mail-opt-in onder het scorebord */
+    .sub { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.08); }
+    .sub[hidden], .sub form[hidden], .sub-open[hidden], .sub .done[hidden] { display: none; }
+    .sub-open { font: inherit; font-size: 14px; font-weight: 600; color: #fff; cursor: pointer; padding: 9px 14px; border-radius: 999px;
+      background: rgba(255,255,255,.06); border: 1px solid var(--glass-border); }
+    .sub-open:hover { border-color: rgba(167,139,250,.6); }
+    .sub .row { display: flex; gap: 8px; margin-top: 10px; }
+    .sub input[type=email] { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: #fff; padding: 10px 14px; border-radius: 999px;
+      background: rgba(255,255,255,.06); border: 1px solid var(--glass-border); outline: none; user-select: text; -webkit-user-select: text; }
+    .sub input[type=email]:focus { border-color: var(--lavender); }
+    .sub button[type=submit] { font: inherit; font-size: 14px; font-weight: 700; color: #fff; padding: 10px 16px; border: 0; border-radius: 999px; cursor: pointer;
+      background: linear-gradient(135deg, var(--purple), var(--lavender)); white-space: nowrap; }
+    .sub button[type=submit]:disabled { opacity: .5; cursor: wait; }
+    .sub .fine { font-size: 12px; color: var(--faint); margin-top: 8px; }
+    .sub .fine a { color: var(--muted); }
+    .sub .err { color: #FF8FA3; font-size: 13px; margin-top: 6px; }
+    .sub .done { font-weight: 700; color: #fff; }
+    .hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
     #boardMsg[hidden], #boardEmpty[hidden] { display: none; }
 
     @media (max-width: 640px) {
@@ -162,9 +180,23 @@
           <h3>Top 10</h3>
           <ol class="board" id="board"></ol>
           <p id="boardEmpty" hidden>Nog niemand. Word jij de eerste?</p>
+          <div class="sub" id="sub">
+            <button type="button" class="sub-open" id="subOpen">🔔 Mail me als we live gaan</button>
+            <form id="subForm" hidden novalidate>
+              <p><b>Op de hoogte blijven?</b> We mailen je als we live gaan en als iemand je record verbreekt.</p>
+              <div class="row">
+                <input type="email" id="subEmail" placeholder="je@mail.nl" autocomplete="email" aria-label="Je mailadres" required />
+                <button type="submit" id="subBtn">Ja, graag</button>
+              </div>
+              <input type="text" name="website" id="subHp" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
+              <p class="fine">Alleen hiervoor, nooit doorverkocht. Afmelden kan altijd. <a href="privacy.html" target="_blank" rel="noopener">Privacy</a></p>
+              <p class="err" id="subErr" role="alert"></p>
+            </form>
+            <p class="done" id="subDone" hidden>Top, je hoort van ons! 💌</p>
+          </div>
         </div>
       </div>
-      <span class="copy">© 2026 Kynetik</span>
+      <span class="copy">© 2026 Kynetik · <a href="privacy.html" style="color:inherit">Privacy</a></span>
     </footer>
   </div>
 
@@ -392,13 +424,49 @@
           if (!d.ok) { errEl.textContent = d.error || 'Opslaan lukte niet'; return; }
           try { localStorage.setItem('kynetik-name', name); } catch (e) {}
           render(d.top, name);
+          savedName = name; savedScore = pending.score;
           form.hidden = true; pending = null;
+          openSub();
           msgEl.textContent = d.kept ? 'Je record staat al hoger 💪' : d.rank === 1 ? 'Nummer 1! 🏆' : 'Je staat op #' + d.rank + '!';
           msgEl.hidden = false;
         })
         .catch(function () { errEl.textContent = 'Geen verbinding, probeer het zo opnieuw'; })
         .then(function () { saveBtn.disabled = false; });
     });
+    /* ---------- Mail-opt-in: alleen als de bezoeker het zelf invult en verstuurt ---------- */
+    var SUB_API = 'api/subscribe.php', savedName = '', savedScore = 0;
+    var subBox = document.getElementById('sub'), subOpen = document.getElementById('subOpen'),
+        subForm = document.getElementById('subForm'), subEmail = document.getElementById('subEmail'),
+        subBtn = document.getElementById('subBtn'), subErr = document.getElementById('subErr'),
+        subDone = document.getElementById('subDone');
+    var subscribed = false;
+    try { subscribed = localStorage.getItem('kynetik-sub') === '1'; } catch (e) {}
+    if (subscribed) subBox.hidden = true;
+
+    function openSub() {
+      if (subscribed) return;
+      subOpen.hidden = true; subForm.hidden = false; subErr.textContent = '';
+    }
+    subOpen.addEventListener('click', function () { openSub(); if (!touch) subEmail.focus(); });
+    subForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = subEmail.value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { subErr.textContent = 'Dat mailadres klopt niet helemaal'; return; }
+      subBtn.disabled = true; subErr.textContent = '';
+      fetch(SUB_API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, name: savedName, score: savedScore, consent: true, website: document.getElementById('subHp').value }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) { subErr.textContent = d.error || 'Aanmelden lukte niet'; return; }
+          subscribed = true;
+          try { localStorage.setItem('kynetik-sub', '1'); } catch (e) {}
+          subForm.hidden = true; subDone.hidden = false;
+          subDone.textContent = d.already ? 'Je stond er al op. Tot snel! 💌' : 'Top, je hoort van ons! 💌';
+        })
+        .catch(function () { subErr.textContent = 'Geen verbinding, probeer het zo opnieuw'; })
+        .then(function () { subBtn.disabled = false; });
+    });
+
     document.getElementById('skipBtn').addEventListener('click', function () { openPanel(false); });
     boardBtn.addEventListener('click', function () { openPanel(panel.hidden); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) openPanel(false); });
