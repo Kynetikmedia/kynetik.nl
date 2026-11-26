@@ -144,7 +144,7 @@
       <div class="footer-left">
         <div class="game" aria-live="polite">
           <span class="score" id="score">0</span>
-          <small id="hint"><b>Tik de bal</b> en houd hem hoog.<br />Record: <span id="best">0</span></small>
+          <small id="hint"><b id="hintTop">Tik de bal</b><span id="hintRest"> en houd hem hoog.</span><br /><span id="lvl"></span>Record: <span id="best">0</span></small>
           <div class="toast" id="toast"></div>
         </div>
         <button class="board-btn" id="boardBtn" type="button" aria-expanded="false" aria-controls="panel" hidden>🏆 Top 10</button>
@@ -177,13 +177,28 @@
     var W, H, dpr, R;
     var b = { x: 0, y: 0, vx: 0, vy: 0, rest: true };
     var trail = [], score = 0, best = 0, kicks = 0, toastT;
+    var R0, lastKick = 0, wind = 0, windT = 0, dashT = 0, streaks = [];
+    var lvlEl = document.getElementById('lvl');
+
+    /* ---------- Moeilijkheid: hoe hoger je score, hoe pittiger ----------
+       Level 1 (0-4)   rustig
+       Level 2 (5-9)   bal valt steeds sneller
+       Level 3 (10-14) bal wordt kleiner
+       Level 4 (15-24) wind die van richting wisselt
+       Level 5 (25+)   chaos: de bal schiet af en toe zelf opzij */
+    function level(n) { return n < 5 ? 1 : n < 10 ? 2 : n < 15 ? 3 : n < 25 ? 4 : 5; }
+    function gMul(n) { return 1 + Math.min(n, 40) * 0.02; }                        // tot 1,8x zwaartekracht
+    function sizeMul(n) { return n < 10 ? 1 : Math.max(0.6, 1 - (n - 9) * 0.025); } // tot 60% van de grootte
+    function hitMul(n) { return Math.max(1.35, 1.9 - n * 0.02); }                  // tikvlak krimpt mee
+    function showLevel() { var l = level(score); lvlEl.textContent = score > 0 && l > 1 ? 'Level ' + l + ' · ' : ''; }
 
     try { best = +localStorage.getItem('kynetik-best') || 0; } catch (e) {}
     bestEl.textContent = best;
 
     var lines = {
-      1: 'Lekker!', 3: 'Ja, je hebt hem!', 5: 'Kinetisch talent 🔥', 10: 'Tien! Kom je bij ons werken?',
-      15: 'Oké, dit is indrukwekkend.', 25: 'Wij gaan maar weer bouwen…', 50: 'Legende. Mail ons je score.'
+      1: 'Lekker!', 3: 'Ja, je hebt hem!', 5: 'Level 2: hij wordt sneller ⚡', 10: 'Level 3: kleinere bal 👀',
+      15: 'Level 4: wind! 🌬️', 20: 'Twintig. Kom je bij ons werken?', 25: 'Level 5: chaos 🌀',
+      35: 'Oké, dit is indrukwekkend.', 50: 'Legende. Mail ons je score.'
     };
     var fails = ['Oeps.', 'Nog een keer!', 'Bijna!', 'De bal wint deze ronde.'];
 
@@ -191,7 +206,8 @@
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       W = window.innerWidth; H = window.innerHeight;
       c.width = W * dpr; c.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
-      R = Math.max(26, Math.min(46, Math.min(W, H) * 0.045));
+      R0 = Math.max(26, Math.min(46, Math.min(W, H) * 0.045));
+      R = R0 * sizeMul(score);
       if (b.rest) place();
     }
     function floor() { return H - R - (W < 640 ? 110 : 120); }
@@ -208,17 +224,24 @@
       if (n > best) { best = n; bestEl.textContent = best; try { localStorage.setItem('kynetik-best', best); } catch (e) {} }
     }
 
-    function hit(px, py) { var dx = px - b.x, dy = py - b.y; return dx * dx + dy * dy < (R * 1.9) * (R * 1.9); }
+    function hit(px, py) { var dx = px - b.x, dy = py - b.y, r = R * hitMul(score); return dx * dx + dy * dy < r * r; }
 
     function kick(px) {
-      var off = (b.x - px) / R; // tik je links, dan gaat hij naar rechts
-      b.vx = off * 260 + (Math.random() - .5) * 120;
-      b.vy = -Math.min(H * 1.25, 900 + Math.random() * 120);
+      var t = performance.now();
+      if (t - lastKick < 220) return; // geen dubbeltik-trucjes
+      lastKick = t;
+      var off = (b.x - px) / R, s = Math.sqrt(gMul(score + 1)); // tik je links, dan gaat hij naar rechts
+      var spread = 120 + Math.min(score, 30) * 12;                // hogere score = grilliger
+      b.vx = off * 260 + (Math.random() - .5) * spread;
+      b.vy = -Math.min(H * 1.25, 900 + Math.random() * 120) * s;  // zelfde hoogte, maar sneller
       setScore(score + 1);
       if (score === 1) newRun();
+      if (score === 15) { wind = Math.random() < .5 ? -1 : 1; windT = 3; }
+      if (score === 25) dashT = 1.5;
       b.rest = false; kicks++;
-      if (lines[score]) say(lines[score]);
-      if (kicks === 1) { hintEl.firstChild.textContent = 'Niet laten vallen!'; hintEl.childNodes[1].textContent = ''; }
+      if (lines[score]) say(lines[score], score % 5 === 0 && score <= 25 ? 1800 : 1100);
+      showLevel();
+      if (kicks === 1) { document.getElementById('hintTop').textContent = 'Niet laten vallen!'; document.getElementById('hintRest').textContent = ''; }
     }
 
     function down(e) {
@@ -232,8 +255,22 @@
     var last = performance.now(), idle = 0;
     function step(now) {
       var dt = Math.min(.033, (now - last) / 1000); last = now;
+      // balgrootte glijdt mee met het level
+      R += (R0 * sizeMul(score) - R) * Math.min(1, dt * 4);
+      var lv = level(score);
+      // wind (level 4+): duwt opzij en draait om de paar seconden
+      if (lv >= 4) {
+        windT -= dt;
+        if (windT <= 0) { wind = -wind || 1; windT = 2.5 + Math.random() * 1.8; say(wind > 0 ? 'Wind →' : '← Wind', 900); }
+      } else wind = 0;
       if (!b.rest) {
-        b.vy += 1900 * dt;
+        b.vy += 1900 * gMul(score) * dt;
+        if (wind) b.vx += wind * Math.min(460, 200 + (score - 15) * 12) * dt;
+        // chaos (level 5): af en toe schiet hij zelf opzij
+        if (lv >= 5) {
+          dashT -= dt;
+          if (dashT <= 0) { b.vx += (Math.random() < .5 ? -1 : 1) * (260 + Math.random() * 160); dashT = 1.6 + Math.random() * 1.8; }
+        }
         b.x += b.vx * dt; b.y += b.vy * dt;
         if (b.x < R) { b.x = R; b.vx = Math.abs(b.vx) * .8; }
         if (b.x > W - R) { b.x = W - R; b.vx = -Math.abs(b.vx) * .8; }
@@ -244,7 +281,7 @@
           if (Math.abs(b.vy) > 260) {
             if (score > 0) {
               var final = score;
-              score = 0; scoreEl.textContent = 0;
+              score = 0; scoreEl.textContent = 0; showLevel(); dashT = 2;
               if (!offerSave(final)) say(final >= 3 ? 'Score: ' + final + '. ' + fails[Math.random() * fails.length | 0] : fails[Math.random() * fails.length | 0]);
             }
             b.vy = -b.vy * .42; b.vx *= .7;
@@ -263,6 +300,18 @@
 
     function draw() {
       x.clearRect(0, 0, W, H);
+      // windstrepen
+      if (wind) {
+        while (streaks.length < 14) streaks.push({ x: Math.random() * W, y: Math.random() * H, l: 40 + Math.random() * 90, v: 500 + Math.random() * 500 });
+        x.strokeStyle = 'rgba(167,139,250,.18)'; x.lineWidth = 2; x.lineCap = 'round';
+        x.beginPath();
+        streaks.forEach(function (s) {
+          s.x += wind * s.v / 60;
+          if (s.x > W + s.l) s.x = -s.l; if (s.x < -s.l) s.x = W + s.l;
+          x.moveTo(s.x, s.y); x.lineTo(s.x - wind * s.l, s.y);
+        });
+        x.stroke();
+      } else streaks.length = 0;
       // vloer-schaduw
       var f = floor(), h = Math.max(0, Math.min(1, (f - b.y) / (H * .6)));
       x.fillStyle = 'rgba(108,99,255,' + (.28 * (1 - h)) + ')';
