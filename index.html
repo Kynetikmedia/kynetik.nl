@@ -76,6 +76,41 @@
       transition: opacity .25s, transform .35s var(--ease); }
     .toast.show { opacity: 1; transform: none; }
 
+    /* Highscores: knop naast de score en een glazen paneel erboven */
+    .footer-left { position: relative; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .board-btn { font: inherit; font-size: 14px; font-weight: 600; color: #fff; cursor: pointer; padding: 12px 16px; border-radius: 999px;
+      background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); transition: border-color .2s; }
+    .board-btn:hover, .board-btn[aria-expanded="true"] { border-color: rgba(167,139,250,.6); }
+    .board-btn[hidden] { display: none; }
+    .panel { pointer-events: auto; position: absolute; left: 0; bottom: calc(100% + 12px); width: min(340px, calc(100vw - 2 * var(--gutter)));
+      padding: 18px; border-radius: 24px; background: rgba(20,20,28,.82); border: 1px solid var(--glass-border);
+      backdrop-filter: blur(22px) saturate(170%); -webkit-backdrop-filter: blur(22px) saturate(170%); box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+    .panel[hidden] { display: none; }
+    .panel h3 { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #A39DFF; margin-bottom: 10px; }
+    .panel p { font-size: 14px; color: var(--muted); line-height: 1.45; }
+    .panel p b { color: #fff; }
+    .save { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .save[hidden] { display: none; }
+    .save .row { display: flex; gap: 8px; margin-top: 10px; }
+    .save input { flex: 1; min-width: 0; font: inherit; font-size: 16px; color: #fff; padding: 10px 14px; border-radius: 999px;
+      background: rgba(255,255,255,.06); border: 1px solid var(--glass-border); outline: none; user-select: text; -webkit-user-select: text; }
+    .save input:focus { border-color: var(--lavender); }
+    .save button[type=submit] { font: inherit; font-size: 14px; font-weight: 700; color: #fff; padding: 10px 16px; border: 0; border-radius: 999px; cursor: pointer;
+      background: linear-gradient(135deg, var(--purple), var(--lavender)); }
+    .save button[type=submit]:disabled { opacity: .5; cursor: wait; }
+    .save .skip { font: inherit; font-size: 13px; color: var(--faint); background: none; border: 0; padding: 8px 0 0; cursor: pointer; }
+    .save .err { color: #FF8FA3; font-size: 13px; margin-top: 8px; min-height: 0; }
+    .board { list-style: none; padding: 0; margin: 0; counter-reset: r; }
+    .board li { counter-increment: r; display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 15px; border-top: 1px solid rgba(255,255,255,.05); }
+    .board li:first-child { border-top: 0; }
+    .board li::before { content: counter(r); width: 22px; font-size: 13px; font-weight: 700; color: var(--faint); font-variant-numeric: tabular-nums; }
+    .board li:nth-child(1)::before { content: '🥇'; } .board li:nth-child(2)::before { content: '🥈'; } .board li:nth-child(3)::before { content: '🥉'; }
+    .board .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .board .s { font-weight: 800; font-variant-numeric: tabular-nums; }
+    .board li.me { color: var(--lavender); }
+    #boardMsg { font-weight: 700; color: #fff; margin-bottom: 12px; }
+    #boardMsg[hidden], #boardEmpty[hidden] { display: none; }
+
     @media (max-width: 640px) {
       .logo { height: 22px; }
       .mail { font-size: 13px; padding: 8px 14px; }
@@ -106,10 +141,28 @@
     </section>
 
     <footer>
-      <div class="game" aria-live="polite">
-        <span class="score" id="score">0</span>
-        <small id="hint"><b>Tik de bal</b> en houd hem hoog.<br />Record: <span id="best">0</span></small>
-        <div class="toast" id="toast"></div>
+      <div class="footer-left">
+        <div class="game" aria-live="polite">
+          <span class="score" id="score">0</span>
+          <small id="hint"><b>Tik de bal</b> en houd hem hoog.<br />Record: <span id="best">0</span></small>
+          <div class="toast" id="toast"></div>
+        </div>
+        <button class="board-btn" id="boardBtn" type="button" aria-expanded="false" aria-controls="panel" hidden>🏆 Top 10</button>
+        <div class="panel" id="panel" role="dialog" aria-label="Highscores" hidden>
+          <form class="save" id="saveForm" hidden>
+            <p><b>Score <span id="saveScore">0</span>!</b> Zet je naam op het bord.</p>
+            <div class="row">
+              <input id="nameInput" name="name" maxlength="16" autocomplete="nickname" placeholder="Je naam" aria-label="Je naam" required />
+              <button type="submit" id="saveBtn">Opslaan</button>
+            </div>
+            <p class="err" id="saveErr" role="alert"></p>
+            <button type="button" class="skip" id="skipBtn">Nee, bedankt</button>
+          </form>
+          <p id="boardMsg" hidden></p>
+          <h3>Top 10</h3>
+          <ol class="board" id="board"></ol>
+          <p id="boardEmpty" hidden>Nog niemand. Word jij de eerste?</p>
+        </div>
       </div>
       <span class="copy">© 2026 Kynetik</span>
     </footer>
@@ -145,6 +198,7 @@
     function place() { b.x = W < 640 ? W * 0.72 : W * 0.78; b.y = floor(); b.vx = 0; b.vy = 0; }
 
     function say(t, ms) {
+      if (!document.getElementById('panel').hidden) return; // paneel open: geen ballon eroverheen
       toast.textContent = t; toast.classList.add('show');
       clearTimeout(toastT); toastT = setTimeout(function () { toast.classList.remove('show'); }, ms || 1100);
     }
@@ -161,6 +215,7 @@
       b.vx = off * 260 + (Math.random() - .5) * 120;
       b.vy = -Math.min(H * 1.25, 900 + Math.random() * 120);
       setScore(score + 1);
+      if (score === 1) newRun();
       b.rest = false; kicks++;
       if (lines[score]) say(lines[score]);
       if (kicks === 1) { hintEl.firstChild.textContent = 'Niet laten vallen!'; hintEl.childNodes[1].textContent = ''; }
@@ -187,7 +242,11 @@
         if (b.y > f) {
           b.y = f;
           if (Math.abs(b.vy) > 260) {
-            if (score > 0) { say(score >= 3 ? 'Score: ' + score + '. ' + fails[Math.random() * fails.length | 0] : fails[Math.random() * fails.length | 0]); score = 0; scoreEl.textContent = 0; }
+            if (score > 0) {
+              var final = score;
+              score = 0; scoreEl.textContent = 0;
+              if (!offerSave(final)) say(final >= 3 ? 'Score: ' + final + '. ' + fails[Math.random() * fails.length | 0] : fails[Math.random() * fails.length | 0]);
+            }
             b.vy = -b.vy * .42; b.vx *= .7;
           } else { b.vy = 0; b.vx *= .9; if (Math.abs(b.vx) < 8) { b.rest = true; b.vx = 0; } }
         }
@@ -227,6 +286,78 @@
       bg.addColorStop(0, '#D6CCFE'); bg.addColorStop(.5, '#A78BFA'); bg.addColorStop(1, '#6C63FF');
       x.fillStyle = bg; x.beginPath(); x.arc(b.x, b.y, R, 0, Math.PI * 2); x.fill();
     }
+
+    /* ---------- Highscores (api/scores.php op de server) ---------- */
+    var API = 'api/scores.php', apiOk = false, top = [], token = null, pending = null;
+    var panel = document.getElementById('panel'), boardBtn = document.getElementById('boardBtn'),
+        boardEl = document.getElementById('board'), emptyEl = document.getElementById('boardEmpty'),
+        form = document.getElementById('saveForm'), nameIn = document.getElementById('nameInput'),
+        saveBtn = document.getElementById('saveBtn'), errEl = document.getElementById('saveErr'),
+        msgEl = document.getElementById('boardMsg');
+    var touch = window.matchMedia('(pointer: coarse)').matches;
+
+    try { nameIn.value = localStorage.getItem('kynetik-name') || ''; } catch (e) {}
+
+    function api(opts, qs) {
+      return fetch(API + (qs || ''), opts).then(function (r) { return r.json(); });
+    }
+    function render(list, me) {
+      top = list || [];
+      boardEl.textContent = '';
+      top.forEach(function (row) {
+        var li = document.createElement('li'), n = document.createElement('span'), s = document.createElement('span');
+        n.className = 'n'; n.textContent = row.name; s.className = 's'; s.textContent = row.score;
+        if (me && row.name.toLowerCase() === me.toLowerCase()) li.className = 'me';
+        li.appendChild(n); li.appendChild(s); boardEl.appendChild(li);
+      });
+      emptyEl.hidden = top.length > 0;
+    }
+    function openPanel(open) {
+      panel.hidden = !open; boardBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (!open) { form.hidden = true; pending = null; msgEl.hidden = true; }
+    }
+    function qualifies(n) { return n >= 3 && (top.length < 10 || n > top[top.length - 1].score); }
+
+    function newRun() {
+      token = null;
+      if (!apiOk) return;
+      api({}, '?token=1').then(function (d) { if (d.ok) token = d.token; }).catch(function () {});
+    }
+    function offerSave(n) {
+      if (!apiOk || !token || !qualifies(n)) return false;
+      pending = { score: n, token: token }; token = null;
+      document.getElementById('saveScore').textContent = n;
+      errEl.textContent = ''; form.hidden = false; openPanel(true);
+      if (!touch) nameIn.focus();
+      return true;
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!pending) return;
+      var name = nameIn.value.trim();
+      saveBtn.disabled = true; errEl.textContent = '';
+      api({ method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, score: pending.score, token: pending.token }) })
+        .then(function (d) {
+          if (!d.ok) { errEl.textContent = d.error || 'Opslaan lukte niet'; return; }
+          try { localStorage.setItem('kynetik-name', name); } catch (e) {}
+          render(d.top, name);
+          form.hidden = true; pending = null;
+          msgEl.textContent = d.kept ? 'Je record staat al hoger 💪' : d.rank === 1 ? 'Nummer 1! 🏆' : 'Je staat op #' + d.rank + '!';
+          msgEl.hidden = false;
+        })
+        .catch(function () { errEl.textContent = 'Geen verbinding, probeer het zo opnieuw'; })
+        .then(function () { saveBtn.disabled = false; });
+    });
+    document.getElementById('skipBtn').addEventListener('click', function () { openPanel(false); });
+    boardBtn.addEventListener('click', function () { openPanel(panel.hidden); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) openPanel(false); });
+
+    api({}).then(function (d) {
+      if (!d.ok) return;
+      apiOk = true; render(d.top); boardBtn.hidden = false;
+    }).catch(function () { /* geen server (bv. lokaal): spel werkt gewoon zonder scorebord */ });
 
     size(); requestAnimationFrame(step);
   })();
