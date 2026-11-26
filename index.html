@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Kynetik · Binnenkort live</title>
+  <meta name="description" content="Kynetik maakt video die beweegt. Onze site wordt nog gebouwd, kom snel terug." />
+  <meta name="theme-color" content="#0F0F0F" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta property="og:title" content="Kynetik · Binnenkort live" />
+  <meta property="og:description" content="Kynetik maakt video die beweegt. Onze site wordt nog gebouwd." />
+  <meta property="og:image" content="https://kynetik.nl/og-image.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --purple: #6C63FF; --lavender: #A78BFA;
+      --bg: #0F0F0F; --text: #fff; --muted: rgba(255,255,255,.64); --faint: rgba(255,255,255,.38);
+      --glass: rgba(255,255,255,.055); --glass-border: rgba(255,255,255,.13);
+      --ease: cubic-bezier(.2,.8,.2,1);
+      --gutter: clamp(16px, 4vw, 48px);
+    }
+    * { box-sizing: border-box; margin: 0; }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+      overflow: hidden; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+    }
+
+    /* Paarse gloed op de achtergrond */
+    .orbs { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+    .orbs span { position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%; filter: blur(40px); opacity: .55; }
+    .orbs span:nth-child(1) { background: radial-gradient(circle, rgba(108,99,255,.55), transparent 65%); top: -30vmax; left: -22vmax; animation: d1 26s ease-in-out infinite alternate; }
+    .orbs span:nth-child(2) { background: radial-gradient(circle, rgba(167,139,250,.35), transparent 65%); bottom: -38vmax; right: -26vmax; animation: d2 32s ease-in-out infinite alternate; }
+    @keyframes d1 { to { transform: translate(14vmax, 10vmax); } }
+    @keyframes d2 { to { transform: translate(-12vmax, -8vmax); } }
+
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; cursor: default; }
+    canvas.over-ball { cursor: pointer; }
+
+    .ui { position: fixed; inset: 0; z-index: 2; pointer-events: none; display: flex; flex-direction: column; padding: max(20px, env(safe-area-inset-top)) var(--gutter) max(20px, env(safe-area-inset-bottom)); }
+    .ui a, .ui button { pointer-events: auto; }
+
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .logo { height: 26px; width: auto; display: block; }
+    .mail { color: var(--muted); text-decoration: none; font-size: 15px; font-weight: 500; padding: 10px 18px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); transition: color .2s, border-color .2s; }
+    .mail:hover { color: #fff; border-color: rgba(167,139,250,.6); }
+
+    .hero { flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: 980px; }
+    .label { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #A39DFF; margin-bottom: 22px; }
+    .label i { width: 8px; height: 8px; border-radius: 50%; background: #FF4D6D; box-shadow: 0 0 12px #FF4D6D; animation: blink 1.4s steps(2) infinite; }
+    @keyframes blink { 50% { opacity: .2; } }
+    h1 { font-size: clamp(46px, 9.5vw, 128px); font-weight: 800; letter-spacing: -.045em; line-height: .95; }
+    h1 em { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-style: italic; letter-spacing: -.01em; padding-right: .06em;
+      background: linear-gradient(135deg, var(--purple), var(--lavender)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .lead { margin-top: 24px; color: var(--muted); font-size: clamp(17px, 1.7vw, 21px); line-height: 1.5; max-width: 40ch; }
+
+    footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .game { display: flex; align-items: center; gap: 14px; padding: 12px 18px 12px 14px; border-radius: 999px; background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+    .score { font-variant-numeric: tabular-nums; font-weight: 800; font-size: 28px; min-width: 2ch; text-align: center; letter-spacing: -.03em; transition: transform .15s var(--ease); }
+    .score.pop { transform: scale(1.35); color: var(--lavender); }
+    .game small { display: block; font-size: 13px; color: var(--muted); line-height: 1.35; }
+    .game small b { color: #fff; font-weight: 600; }
+    .copy { font-size: 13px; color: var(--faint); }
+
+    /* Meldingen van het spelletje: tekstballon boven de score, nooit over de kop */
+    .game { position: relative; }
+    .toast { position: absolute; left: 0; bottom: calc(100% + 12px); transform: translateY(8px) scale(.9); transform-origin: 24px 100%; opacity: 0; pointer-events: none;
+      padding: 10px 16px; border-radius: 18px 18px 18px 6px; background: linear-gradient(135deg, var(--purple), var(--lavender)); color: #fff;
+      font-weight: 700; font-size: 15px; letter-spacing: -.01em; white-space: nowrap; box-shadow: 0 10px 30px rgba(108,99,255,.35);
+      transition: opacity .25s, transform .35s var(--ease); }
+    .toast.show { opacity: 1; transform: none; }
+
+    @media (max-width: 640px) {
+      .logo { height: 22px; }
+      .mail { font-size: 13px; padding: 8px 14px; }
+      .hero { justify-content: flex-start; padding-top: 12vh; }
+      .copy { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) { .orbs span, .label i { animation: none; } }
+  </style>
+</head>
+<body>
+  <div class="orbs" aria-hidden="true"><span></span><span></span></div>
+  <canvas id="c" aria-label="Speel met de bal: tik hem omhoog en houd hem hoog"></canvas>
+
+  <div class="ui">
+    <header>
+      <svg class="logo" viewBox="6.55 -328 1363.45 427.2" role="img" aria-label="Kynetik">
+        <defs><linearGradient id="dot" gradientUnits="userSpaceOnUse" x1="921.48" y1="0" x2="1105.48" y2="0"><stop offset="0" stop-color="rgba(108,99,255,0)"/><stop offset=".4" stop-color="rgba(108,99,255,.55)"/><stop offset=".72" stop-color="#6C63FF"/><stop offset="1" stop-color="#A78BFA"/></linearGradient></defs>
+        <text x="0" y="0" fill="#fff" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="400" letter-spacing="-22">kynetık</text>
+        <rect x="921.48" y="-312" width="184" height="68" rx="34" fill="url(#dot)"/>
+      </svg>
+      <a class="mail" href="mailto:info@kynetik.nl">info@kynetik.nl</a>
+    </header>
+
+    <section class="hero">
+      <span class="label"><i></i>Coming soon</span>
+      <h1>We zijn nog even aan het <em>bouwen.</em></h1>
+      <p class="lead">Kynetik maakt video die beweegt. Onze site staat nog in de steigers. Kom snel terug, of mail ons gewoon.</p>
+    </section>
+
+    <footer>
+      <div class="game" aria-live="polite">
+        <span class="score" id="score">0</span>
+        <small id="hint"><b>Tik de bal</b> en houd hem hoog.<br />Record: <span id="best">0</span></small>
+        <div class="toast" id="toast"></div>
+      </div>
+      <span class="copy">© 2026 Kynetik</span>
+    </footer>
+  </div>
+
+  <script>
+  (function () {
+    var c = document.getElementById('c'), x = c.getContext('2d');
+    var scoreEl = document.getElementById('score'), bestEl = document.getElementById('best'),
+        hintEl = document.getElementById('hint'), toast = document.getElementById('toast');
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var W, H, dpr, R;
+    var b = { x: 0, y: 0, vx: 0, vy: 0, rest: true };
+    var trail = [], score = 0, best = 0, kicks = 0, toastT;
+
+    try { best = +localStorage.getItem('kynetik-best') || 0; } catch (e) {}
+    bestEl.textContent = best;
+
+    var lines = {
+      1: 'Lekker!', 3: 'Ja, je hebt hem!', 5: 'Kinetisch talent 🔥', 10: 'Tien! Kom je bij ons werken?',
+      15: 'Oké, dit is indrukwekkend.', 25: 'Wij gaan maar weer bouwen…', 50: 'Legende. Mail ons je score.'
+    };
+    var fails = ['Oeps.', 'Nog een keer!', 'Bijna!', 'De bal wint deze ronde.'];
+
+    function size() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = window.innerWidth; H = window.innerHeight;
+      c.width = W * dpr; c.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+      R = Math.max(26, Math.min(46, Math.min(W, H) * 0.045));
+      if (b.rest) place();
+    }
+    function floor() { return H - R - (W < 640 ? 110 : 120); }
+    function place() { b.x = W < 640 ? W * 0.72 : W * 0.78; b.y = floor(); b.vx = 0; b.vy = 0; }
+
+    function say(t, ms) {
+      toast.textContent = t; toast.classList.add('show');
+      clearTimeout(toastT); toastT = setTimeout(function () { toast.classList.remove('show'); }, ms || 1100);
+    }
+    function setScore(n) {
+      score = n; scoreEl.textContent = n;
+      scoreEl.classList.add('pop'); setTimeout(function () { scoreEl.classList.remove('pop'); }, 140);
+      if (n > best) { best = n; bestEl.textContent = best; try { localStorage.setItem('kynetik-best', best); } catch (e) {} }
+    }
+
+    function hit(px, py) { var dx = px - b.x, dy = py - b.y; return dx * dx + dy * dy < (R * 1.9) * (R * 1.9); }
+
+    function kick(px) {
+      var off = (b.x - px) / R; // tik je links, dan gaat hij naar rechts
+      b.vx = off * 260 + (Math.random() - .5) * 120;
+      b.vy = -Math.min(H * 1.25, 900 + Math.random() * 120);
+      setScore(score + 1);
+      b.rest = false; kicks++;
+      if (lines[score]) say(lines[score]);
+      if (kicks === 1) { hintEl.firstChild.textContent = 'Niet laten vallen!'; hintEl.childNodes[1].textContent = ''; }
+    }
+
+    function down(e) {
+      var p = e.touches ? e.touches[0] : e;
+      if (hit(p.clientX, p.clientY)) { e.preventDefault(); kick(p.clientX); }
+    }
+    c.addEventListener('pointerdown', down);
+    c.addEventListener('pointermove', function (e) { c.classList.toggle('over-ball', hit(e.clientX, e.clientY)); });
+    window.addEventListener('resize', size);
+
+    var last = performance.now(), idle = 0;
+    function step(now) {
+      var dt = Math.min(.033, (now - last) / 1000); last = now;
+      if (!b.rest) {
+        b.vy += 1900 * dt;
+        b.x += b.vx * dt; b.y += b.vy * dt;
+        if (b.x < R) { b.x = R; b.vx = Math.abs(b.vx) * .8; }
+        if (b.x > W - R) { b.x = W - R; b.vx = -Math.abs(b.vx) * .8; }
+        if (b.y < R) { b.y = R; b.vy = Math.abs(b.vy) * .5; }
+        var f = floor();
+        if (b.y > f) {
+          b.y = f;
+          if (Math.abs(b.vy) > 260) {
+            if (score > 0) { say(score >= 3 ? 'Score: ' + score + '. ' + fails[Math.random() * fails.length | 0] : fails[Math.random() * fails.length | 0]); score = 0; scoreEl.textContent = 0; }
+            b.vy = -b.vy * .42; b.vx *= .7;
+          } else { b.vy = 0; b.vx *= .9; if (Math.abs(b.vx) < 8) { b.rest = true; b.vx = 0; } }
+        }
+      } else if (!reduce) {
+        // Even wiebelen in rust: "speel met me"
+        idle += dt;
+        if (kicks === 0 && idle > 2.2) { b.vy = -380; b.rest = false; idle = 0; }
+      }
+
+      trail.push({ x: b.x, y: b.y }); if (trail.length > 14) trail.shift();
+      draw();
+      requestAnimationFrame(step);
+    }
+
+    function draw() {
+      x.clearRect(0, 0, W, H);
+      // vloer-schaduw
+      var f = floor(), h = Math.max(0, Math.min(1, (f - b.y) / (H * .6)));
+      x.fillStyle = 'rgba(108,99,255,' + (.28 * (1 - h)) + ')';
+      x.beginPath(); x.ellipse(b.x, f + R + 6, R * (1.1 - h * .5), R * .22 * (1 - h * .5), 0, 0, Math.PI * 2); x.fill();
+
+      // staart: de beweging van het beeldmerk
+      var t0 = trail[0], speed = Math.hypot(b.vx, b.vy);
+      if (t0 && speed > 40) {
+        var g = x.createLinearGradient(t0.x, t0.y, b.x, b.y);
+        g.addColorStop(0, 'rgba(108,99,255,0)'); g.addColorStop(.6, 'rgba(108,99,255,.5)'); g.addColorStop(1, 'rgba(108,99,255,.95)');
+        x.strokeStyle = g; x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = R * 1.2;
+        x.beginPath(); x.moveTo(t0.x, t0.y);
+        for (var i = 1; i < trail.length; i++) x.lineTo(trail[i].x, trail[i].y);
+        x.stroke();
+      }
+      // gloed + bal
+      var glow = x.createRadialGradient(b.x, b.y, R * .6, b.x, b.y, R * 2.6);
+      glow.addColorStop(0, 'rgba(167,139,250,.35)'); glow.addColorStop(1, 'rgba(167,139,250,0)');
+      x.fillStyle = glow; x.beginPath(); x.arc(b.x, b.y, R * 2.6, 0, Math.PI * 2); x.fill();
+      var bg = x.createRadialGradient(b.x - R * .35, b.y - R * .35, R * .1, b.x, b.y, R * 1.1);
+      bg.addColorStop(0, '#D6CCFE'); bg.addColorStop(.5, '#A78BFA'); bg.addColorStop(1, '#6C63FF');
+      x.fillStyle = bg; x.beginPath(); x.arc(b.x, b.y, R, 0, Math.PI * 2); x.fill();
+    }
+
+    size(); requestAnimationFrame(step);
+  })();
+  </script>
+</body>
+</html>
